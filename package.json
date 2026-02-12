@@ -1,0 +1,25 @@
+{
+  "name": "design-scout",
+  "version": "0.2.0",
+  "description": "AI Design Research Agent — crawl websites, analyze UI/UX, generate design briefs",
+  "type": "module",
+  "scripts": {
+    "scout": "tsx src/cli.ts",
+    "scout:url": "tsx src/cli.ts --url",
+    "scout:category": "tsx src/cli.ts --category",
+    "setup:db": "tsx src/setup-db.ts"
+  },
+  "dependencies": {
+    "openai": "^4.77.0",
+    "@supabase/supabase-js": "^2.47.0",
+    "commander": "^12.1.0",
+    "playwright": "^1.49.0",
+    "sharp": "^0.33.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}
