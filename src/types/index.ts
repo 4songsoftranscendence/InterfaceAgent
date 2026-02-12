@@ -33,34 +33,39 @@ export interface Screenshot {
 // Analysis Output (Enhanced with Psychology)
 // ============================================
 
+export interface JustifiedScore {
+  score: number;
+  justification: string;
+}
+
 export interface UIAnalysis {
   url: string;
   overallScore: number;
 
-  // Core Visual Scores (1-10 each)
+  // Core Visual Scores (1-10 each, with justification)
   scores: {
-    visualHierarchy: number;
-    colorUsage: number;
-    typography: number;
-    spacing: number;
-    ctaClarity: number;
-    navigation: number;
-    mobileReadiness: number;
-    consistency: number;
-    accessibility: number;
-    engagement: number;
+    visualHierarchy: JustifiedScore;
+    colorUsage: JustifiedScore;
+    typography: JustifiedScore;
+    spacing: JustifiedScore;
+    ctaClarity: JustifiedScore;
+    navigation: JustifiedScore;
+    mobileReadiness: JustifiedScore;
+    consistency: JustifiedScore;
+    accessibility: JustifiedScore;
+    engagement: JustifiedScore;
   };
 
-  // Psychology & UX Principle Scores (1-10 each)
+  // Psychology & UX Principle Scores (1-10 each, with justification)
   principleScores: {
-    cognitiveLoad: number;
-    trustSignals: number;
-    affordanceClarity: number;
-    feedbackCompleteness: number;
-    conventionAdherence: number;
-    gestaltCompliance: number;
-    copyQuality: number;
-    conversionPsychology: number;
+    cognitiveLoad: JustifiedScore;
+    trustSignals: JustifiedScore;
+    affordanceClarity: JustifiedScore;
+    feedbackCompleteness: JustifiedScore;
+    conventionAdherence: JustifiedScore;
+    gestaltCompliance: JustifiedScore;
+    copyQuality: JustifiedScore;
+    conversionPsychology: JustifiedScore;
   };
 
   // Qualitative Analysis
@@ -167,8 +172,12 @@ export interface DesignBrief {
 
   analyzedSites: {
     url: string;
-    score: number;
+    overallScore: number;
     keyTakeaway: string;
+    strengths: string[];
+    weaknesses: string[];
+    scoreHighlights: { dimension: string; score: number; justification: string }[];
+    comparisonNotes: string;
   }[];
 }
 

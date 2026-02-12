@@ -23,6 +23,10 @@ export async function GET(
       overallScore: a.overallScore,
       strengths: a.strengths,
       weaknesses: a.weaknesses,
+      topScores: Object.entries(a.scores)
+        .map(([dim, js]) => ({ dimension: dim, score: js.score, justification: js.justification }))
+        .sort((x, y) => y.score - x.score)
+        .slice(0, 5),
     })),
     error: job.error || null,
     createdAt: job.createdAt,

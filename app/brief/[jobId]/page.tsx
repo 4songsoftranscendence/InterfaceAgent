@@ -3,6 +3,23 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+interface ScoreHighlight {
+  dimension: string;
+  score: number;
+  justification: string;
+}
+
+interface AnalyzedSite {
+  url: string;
+  overallScore?: number;
+  score?: number; // backward compat
+  keyTakeaway: string;
+  strengths?: string[];
+  weaknesses?: string[];
+  scoreHighlights?: ScoreHighlight[];
+  comparisonNotes?: string;
+}
+
 interface Brief {
   id: string;
   category: string;
@@ -31,8 +48,29 @@ interface Brief {
     componentList: string[];
   };
   buildPrompts: Record<string, string>;
-  analyzedSites: { url: string; score: number; keyTakeaway: string }[];
+  analyzedSites: AnalyzedSite[];
 }
+
+const DIMENSION_LABELS: Record<string, string> = {
+  visualHierarchy: "Visual Hierarchy",
+  colorUsage: "Color Usage",
+  typography: "Typography",
+  spacing: "Spacing",
+  ctaClarity: "CTA Clarity",
+  navigation: "Navigation",
+  mobileReadiness: "Mobile",
+  consistency: "Consistency",
+  accessibility: "Accessibility",
+  engagement: "Engagement",
+  cognitiveLoad: "Cognitive Load",
+  trustSignals: "Trust Signals",
+  affordanceClarity: "Affordances",
+  feedbackCompleteness: "Feedback",
+  conventionAdherence: "Conventions",
+  gestaltCompliance: "Gestalt",
+  copyQuality: "Copy Quality",
+  conversionPsychology: "Conversion",
+};
 
 function CopyBlock({ title, content, highlight }: { title: string; content: string; highlight?: boolean }) {
   const [copied, setCopied] = useState(false);
@@ -72,12 +110,113 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+function formatText(text: string): string {
+  const trimmed = text.trim();
+  if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === "object" && !Array.isArray(parsed)) {
+        return Object.entries(parsed)
+          .map(([k, v]) => `${k.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase()).trim()}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
+          .join("\n\n");
+      }
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => typeof item === "string" ? item : JSON.stringify(item)).join("\n");
+      }
+    } catch {
+      // Not valid JSON, render as-is
+    }
+  }
+  return text;
+}
+
 function TextCard({ label, text }: { label: string; text: string }) {
   if (!text) return null;
+  const displayText = typeof text === "string" ? formatText(text) : String(text);
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
       <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">{label}</div>
-      <div className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{text}</div>
+      <div className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{displayText}</div>
+    </div>
+  );
+}
+
+function scoreColor(score: number): string {
+  if (score >= 8) return "text-green-700 bg-green-50";
+  if (score >= 6) return "text-blue-700 bg-blue-50";
+  if (score >= 4) return "text-yellow-700 bg-yellow-50";
+  return "text-red-700 bg-red-50";
+}
+
+function SiteCard({ site }: { site: AnalyzedSite }) {
+  const siteScore = site.overallScore || site.score || 0;
+  const hasDetails = (site.strengths && site.strengths.length > 0) || (site.scoreHighlights && site.scoreHighlights.length > 0);
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-5 space-y-3">
+      {/* Header: URL + Score */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium truncate max-w-[70%]">{site.url}</div>
+        <div className={`rounded-full px-3 py-1 text-lg font-bold ${scoreColor(siteScore)}`}>
+          {siteScore}/10
+        </div>
+      </div>
+
+      {/* Key Takeaway */}
+      {site.keyTakeaway && (
+        <div className="text-sm text-gray-600">{site.keyTakeaway}</div>
+      )}
+
+      {/* Comparison Notes */}
+      {site.comparisonNotes && (
+        <div className="text-xs text-blue-600 italic border-l-2 border-blue-200 pl-3">{site.comparisonNotes}</div>
+      )}
+
+      {hasDetails && (
+        <>
+          {/* Strengths and Weaknesses */}
+          {((site.strengths && site.strengths.length > 0) || (site.weaknesses && site.weaknesses.length > 0)) && (
+            <div className="grid grid-cols-2 gap-3">
+              {site.strengths && site.strengths.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-green-700 mb-1">Strengths</div>
+                  {site.strengths.map((s, i) => (
+                    <div key={i} className="text-xs text-gray-600 mb-0.5">+ {s}</div>
+                  ))}
+                </div>
+              )}
+              {site.weaknesses && site.weaknesses.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-red-700 mb-1">Weaknesses</div>
+                  {site.weaknesses.map((w, i) => (
+                    <div key={i} className="text-xs text-gray-600 mb-0.5">- {w}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Score Highlights with Justifications */}
+          {site.scoreHighlights && site.scoreHighlights.length > 0 && (
+            <div className="space-y-1.5 border-t border-gray-100 pt-3">
+              <div className="text-xs font-semibold text-gray-500">Score Highlights</div>
+              {site.scoreHighlights.map((h, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  <span className={`font-mono font-bold shrink-0 w-5 text-right ${h.score >= 7 ? "text-green-600" : h.score >= 5 ? "text-gray-600" : "text-red-600"}`}>
+                    {h.score}
+                  </span>
+                  <span className="text-gray-400 shrink-0">
+                    {DIMENSION_LABELS[h.dimension] || h.dimension}
+                  </span>
+                  {h.justification && (
+                    <span className="text-gray-600">{h.justification}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -168,6 +307,20 @@ export default function BriefPage() {
         <TextCard label="Target Audience" text={brief.targetAudience} />
       </Section>
 
+      {/* Baseline Comparison — Analyzed Sites (moved up to establish context) */}
+      {brief.analyzedSites?.length > 0 && (
+        <Section title="Baseline Comparison">
+          <p className="text-sm text-gray-500">
+            These {brief.analyzedSites.length} sites were analyzed as reference benchmarks for your design brief.
+          </p>
+          <div className="space-y-3">
+            {brief.analyzedSites.map((site) => (
+              <SiteCard key={site.url} site={site} />
+            ))}
+          </div>
+        </Section>
+      )}
+
       {/* Psychology */}
       <Section title="Psychology Strategy">
         <div className="grid gap-4 md:grid-cols-2">
@@ -241,26 +394,6 @@ export default function BriefPage() {
             ))}
         </div>
       </Section>
-
-      {/* Analyzed Sites */}
-      {brief.analyzedSites?.length > 0 && (
-        <Section title="Analyzed Sites">
-          <div className="space-y-2">
-            {brief.analyzedSites.map((site) => (
-              <div
-                key={site.url}
-                className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3"
-              >
-                <div>
-                  <div className="text-sm font-medium">{site.url}</div>
-                  <div className="text-xs text-gray-500">{site.keyTakeaway}</div>
-                </div>
-                <div className="text-lg font-bold text-gray-700">{site.score}/10</div>
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
     </div>
   );
 }

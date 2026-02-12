@@ -45,7 +45,7 @@ export default function Home() {
   const [errorMsg, setErrorMsg] = useState("");
 
   function addUrl() {
-    if (urls.length < 5) setUrls([...urls, ""]);
+    if (urls.length < 10) setUrls([...urls, ""]);
   }
 
   function removeUrl(index: number) {
@@ -329,7 +329,7 @@ export default function Home() {
               </div>
             ))}
           </div>
-          {urls.length < 5 && (
+          {urls.length < 10 && (
             <button
               type="button"
               onClick={addUrl}

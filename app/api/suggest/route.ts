@@ -15,8 +15,8 @@ Rules:
 - Pick the single best-matching category from the 6 options above
 - The goal should expand on the user's request with specificity
 - If the user mentions specific sites, include those URLs
-- If the user doesn't mention specific sites, suggest 2-3 well-known examples in the relevant category
-- Return 1-5 URLs total`;
+- If the user doesn't mention specific sites, suggest 5-10 well-known examples in the relevant category
+- Always return 5-10 URLs total — more sites means a richer baseline comparison`;
 
 export async function POST(request: Request) {
   const userApiKey = request.headers.get("X-OpenRouter-Key") || undefined;
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
           return false;
         }
       })
-      .slice(0, 5);
+      .slice(0, 10);
 
     const validCategories = [
       "saas-landing",

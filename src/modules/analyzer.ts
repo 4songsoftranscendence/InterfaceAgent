@@ -1,16 +1,34 @@
 // ============================================
-// DESIGN SCOUT — UI/UX Analyzer v2
+// DESIGN SCOUT — UI/UX Analyzer v3
 // ============================================
 // Sends screenshots to a vision-capable LLM via OpenRouter
 // and returns structured UI/UX analysis with psychology-informed scoring.
+// Each score includes a justification explaining WHY that number was given.
 
 import { chatCompletion, base64ImageBlock } from "../lib/llm";
-import type { CrawlResult, UIAnalysis } from "../types/index";
+import type { CrawlResult, UIAnalysis, JustifiedScore } from "../types/index";
 import {
   SYSTEM_PROMPT,
   ANALYZE_SCREENSHOT_PROMPT,
   CATEGORY_OVERLAYS,
 } from "../prompts/index";
+
+/** Parse a score value that may be { score, justification } or a bare number */
+function parseJustifiedScore(val: unknown): JustifiedScore {
+  if (val && typeof val === "object" && "score" in val) {
+    const obj = val as Record<string, unknown>;
+    return {
+      score: Number(obj.score) || 0,
+      justification: String(obj.justification || ""),
+    };
+  }
+  if (typeof val === "number") {
+    return { score: val, justification: "" };
+  }
+  return { score: 0, justification: "" };
+}
+
+const EMPTY_SCORE: JustifiedScore = { score: 0, justification: "" };
 
 export async function analyzeSite(
   crawlResult: CrawlResult,
@@ -62,14 +80,14 @@ Screenshots: ${crawlResult.screenshots.map((s) => `${s.section} (${s.viewport})`
 
     // Compute overall score: weighted average of core (60%) + principle (40%) scores
     if (analysis.overallScore === 0) {
-      const coreAvg = Object.values(analysis.scores).reduce((a, b) => a + b, 0) / 10;
-      const principleAvg = Object.values(analysis.principleScores).reduce((a, b) => a + b, 0) / 8;
+      const coreAvg = Object.values(analysis.scores).reduce((a, b) => a + b.score, 0) / 10;
+      const principleAvg = Object.values(analysis.principleScores).reduce((a, b) => a + b.score, 0) / 8;
       analysis.overallScore = Math.round((coreAvg * 0.6 + principleAvg * 0.4) * 10) / 10;
     }
 
     console.log(`   ✅ Analysis complete: ${analysis.overallScore}/10 overall`);
-    console.log(`      Core: vis=${analysis.scores.visualHierarchy} col=${analysis.scores.colorUsage} typ=${analysis.scores.typography} cta=${analysis.scores.ctaClarity}`);
-    console.log(`      Psych: cog=${analysis.principleScores.cognitiveLoad} trust=${analysis.principleScores.trustSignals} afford=${analysis.principleScores.affordanceClarity} conv=${analysis.principleScores.conversionPsychology}`);
+    console.log(`      Core: vis=${analysis.scores.visualHierarchy.score} col=${analysis.scores.colorUsage.score} typ=${analysis.scores.typography.score} cta=${analysis.scores.ctaClarity.score}`);
+    console.log(`      Psych: cog=${analysis.principleScores.cognitiveLoad.score} trust=${analysis.principleScores.trustSignals.score} afford=${analysis.principleScores.affordanceClarity.score} conv=${analysis.principleScores.conversionPsychology.score}`);
 
     if (analysis.antiPatterns.length > 0) {
       console.log(`      ⚠️  ${analysis.antiPatterns.length} anti-pattern(s) detected`);
@@ -98,14 +116,14 @@ function parseAnalysisResponse(raw: string, url: string): UIAnalysis {
     url,
     overallScore: 0,
     scores: {
-      visualHierarchy: 0, colorUsage: 0, typography: 0, spacing: 0,
-      ctaClarity: 0, navigation: 0, mobileReadiness: 0,
-      consistency: 0, accessibility: 0, engagement: 0,
+      visualHierarchy: EMPTY_SCORE, colorUsage: EMPTY_SCORE, typography: EMPTY_SCORE, spacing: EMPTY_SCORE,
+      ctaClarity: EMPTY_SCORE, navigation: EMPTY_SCORE, mobileReadiness: EMPTY_SCORE,
+      consistency: EMPTY_SCORE, accessibility: EMPTY_SCORE, engagement: EMPTY_SCORE,
     },
     principleScores: {
-      cognitiveLoad: 0, trustSignals: 0, affordanceClarity: 0,
-      feedbackCompleteness: 0, conventionAdherence: 0, gestaltCompliance: 0,
-      copyQuality: 0, conversionPsychology: 0,
+      cognitiveLoad: EMPTY_SCORE, trustSignals: EMPTY_SCORE, affordanceClarity: EMPTY_SCORE,
+      feedbackCompleteness: EMPTY_SCORE, conventionAdherence: EMPTY_SCORE, gestaltCompliance: EMPTY_SCORE,
+      copyQuality: EMPTY_SCORE, conversionPsychology: EMPTY_SCORE,
     },
     strengths: [],
     weaknesses: [],
@@ -130,26 +148,26 @@ function parseAnalysisResponse(raw: string, url: string): UIAnalysis {
       url,
       overallScore: p.overallScore || 0,
       scores: {
-        visualHierarchy: p.scores?.visualHierarchy || 0,
-        colorUsage: p.scores?.colorUsage || 0,
-        typography: p.scores?.typography || 0,
-        spacing: p.scores?.spacing || 0,
-        ctaClarity: p.scores?.ctaClarity || 0,
-        navigation: p.scores?.navigation || 0,
-        mobileReadiness: p.scores?.mobileReadiness || 0,
-        consistency: p.scores?.consistency || 0,
-        accessibility: p.scores?.accessibility || 0,
-        engagement: p.scores?.engagement || 0,
+        visualHierarchy: parseJustifiedScore(p.scores?.visualHierarchy),
+        colorUsage: parseJustifiedScore(p.scores?.colorUsage),
+        typography: parseJustifiedScore(p.scores?.typography),
+        spacing: parseJustifiedScore(p.scores?.spacing),
+        ctaClarity: parseJustifiedScore(p.scores?.ctaClarity),
+        navigation: parseJustifiedScore(p.scores?.navigation),
+        mobileReadiness: parseJustifiedScore(p.scores?.mobileReadiness),
+        consistency: parseJustifiedScore(p.scores?.consistency),
+        accessibility: parseJustifiedScore(p.scores?.accessibility),
+        engagement: parseJustifiedScore(p.scores?.engagement),
       },
       principleScores: {
-        cognitiveLoad: p.principleScores?.cognitiveLoad || 0,
-        trustSignals: p.principleScores?.trustSignals || 0,
-        affordanceClarity: p.principleScores?.affordanceClarity || 0,
-        feedbackCompleteness: p.principleScores?.feedbackCompleteness || 0,
-        conventionAdherence: p.principleScores?.conventionAdherence || 0,
-        gestaltCompliance: p.principleScores?.gestaltCompliance || 0,
-        copyQuality: p.principleScores?.copyQuality || 0,
-        conversionPsychology: p.principleScores?.conversionPsychology || 0,
+        cognitiveLoad: parseJustifiedScore(p.principleScores?.cognitiveLoad),
+        trustSignals: parseJustifiedScore(p.principleScores?.trustSignals),
+        affordanceClarity: parseJustifiedScore(p.principleScores?.affordanceClarity),
+        feedbackCompleteness: parseJustifiedScore(p.principleScores?.feedbackCompleteness),
+        conventionAdherence: parseJustifiedScore(p.principleScores?.conventionAdherence),
+        gestaltCompliance: parseJustifiedScore(p.principleScores?.gestaltCompliance),
+        copyQuality: parseJustifiedScore(p.principleScores?.copyQuality),
+        conversionPsychology: parseJustifiedScore(p.principleScores?.conversionPsychology),
       },
       strengths: p.strengths || [],
       weaknesses: p.weaknesses || [],

@@ -54,7 +54,9 @@ export async function runPipeline(job: Job, apiKey?: string): Promise<void> {
       return;
     }
 
-    // Step 2: Analyze each site
+    // Step 2: Analyze each site (up to 3 in parallel for speed)
+    const ANALYSIS_CONCURRENCY = 3;
+
     updateJob(job.id, {
       status: "analyzing",
       progress: {
@@ -65,30 +67,43 @@ export async function runPipeline(job: Job, apiKey?: string): Promise<void> {
     });
 
     const analyses = [];
-    for (let i = 0; i < crawlResults.length; i++) {
-      const crawl = crawlResults[i];
+    let analysisCompleted = 0;
+
+    for (let batchStart = 0; batchStart < crawlResults.length; batchStart += ANALYSIS_CONCURRENCY) {
+      const batch = crawlResults.slice(batchStart, batchStart + ANALYSIS_CONCURRENCY);
+      const batchNames = batch.map((c) => new URL(c.url).hostname).join(", ");
+
       updateJob(job.id, {
         progress: {
           ...job.progress,
           sitesCrawled: crawlResults.length,
-          sitesAnalyzed: i,
-          currentStep: `Analyzing ${new URL(crawl.url).hostname} (${i + 1}/${crawlResults.length})...`,
+          sitesAnalyzed: analysisCompleted,
+          currentStep: `Analyzing ${batchNames} (${batchStart + 1}-${Math.min(batchStart + batch.length, crawlResults.length)}/${crawlResults.length})...`,
         },
       });
 
-      try {
-        const analysis = await analyzeSite(crawl, category, apiKey);
-        analyses.push(analysis);
-      } catch (err) {
-        console.error(`Failed to analyze ${crawl.url}:`, err);
+      const batchResults = await Promise.all(
+        batch.map(async (crawl) => {
+          try {
+            return await analyzeSite(crawl, category, apiKey);
+          } catch (err) {
+            console.error(`Failed to analyze ${crawl.url}:`, err);
+            return null;
+          }
+        })
+      );
+
+      for (const result of batchResults) {
+        if (result) analyses.push(result);
+        analysisCompleted++;
       }
 
       updateJob(job.id, {
-        progress: { ...job.progress, sitesCrawled: crawlResults.length, sitesAnalyzed: i + 1 },
+        progress: { ...job.progress, sitesCrawled: crawlResults.length, sitesAnalyzed: analysisCompleted },
       });
 
-      // Rate limit between API calls
-      if (i < crawlResults.length - 1) {
+      // Rate limit between batches
+      if (batchStart + ANALYSIS_CONCURRENCY < crawlResults.length) {
         await new Promise((r) => setTimeout(r, 1000));
       }
     }

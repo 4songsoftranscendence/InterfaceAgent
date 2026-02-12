@@ -9,9 +9,9 @@ export async function POST(request: Request) {
   const { urls, category, goal } = body;
 
   // Validate
-  if (!urls || !Array.isArray(urls) || urls.length === 0 || urls.length > 5) {
+  if (!urls || !Array.isArray(urls) || urls.length === 0 || urls.length > 10) {
     return NextResponse.json(
-      { error: "Provide 1-5 URLs as an array." },
+      { error: "Provide 1-10 URLs as an array." },
       { status: 400 }
     );
   }

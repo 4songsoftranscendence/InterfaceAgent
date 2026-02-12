@@ -83,19 +83,34 @@ PART C — PATTERNS, ANTI-PATTERNS, AND TOKENS
 
 Extract design patterns with the UX principle each leverages. Identify anti-patterns with severity and specific recommendations. Extract design tokens including hex colors, fonts, spacing rhythm, border-radius, shadows, and neutral scale. Document principle-specific observations for: Norman Doors found, Hick's Law violations, Fitts's Law issues, Trunk Test gaps, Von Restorff target assessment, Serial Position placement, Peak-End quality, and Hook Model presence. List the top 3 strengths and top 3 weaknesses, each referencing a specific principle. Identify 2-3 steal-worthy elements worth adapting.
 
-CALIBRATION EXAMPLES
+CALIBRATION — SCORE WITH PRECISION AND DIFFERENTIATION
 
-Here is how scoring should be calibrated:
+You MUST differentiate scores between sites. If two sites are not identical in quality for a dimension, they MUST receive different scores. Giving the same score to every site is a calibration failure. Use the FULL range from 1 to 10.
 
-A score of 9-10 means: Exceptional execution that could be used as a teaching example. Stripe's payment form (real-time validation, specific button copy "Pay $49.99", success animation) scores 9 on Feedback Completeness.
+A score of 10 means: Best-in-class, could teach a masterclass. Linear.app's landing page (perfect visual hierarchy through 3-lever system, every CTA specific and action-oriented, flawless spacing rhythm, no wasted elements). Reserve 10 for genuinely exceptional work — most well-designed sites score 7-8, not 9-10.
 
-A score of 7-8 means: Strong execution with minor gaps. A site with clear visual hierarchy and good CTA placement but slightly inconsistent button styles across sections.
+A score of 9 means: Near-perfect with one tiny gap. Stripe's payment form (real-time field validation, specific "Pay $49.99" button copy, success animation, perfect affordances) — scores 9 on Feedback Completeness because the loading state could be slightly more informative.
 
-A score of 5-6 means: Adequate but unremarkable. Functional but missing opportunities — generic "Submit" CTAs, no social proof, adequate but not strategic spacing.
+A score of 8 means: Clearly above average with deliberate, skilled execution. The site demonstrates intentional design decisions: a real spacing system (not just "looks about right"), purposeful color hierarchy, button styles that are consistent 90%+ of the time. One or two minor inconsistencies exist but don't harm the experience. Example: a site with excellent typography and CTA hierarchy but where the mobile nav feels slightly rushed.
 
-A score of 3-4 means: Significant issues affecting usability. Multiple Hick's Law violations, Norman Doors present, poor contrast, no clear visual hierarchy.
+A score of 7 means: Good but not remarkable. Solid fundamentals are present — readable type, reasonable spacing, working CTAs — but the execution is safe rather than strategic. You can tell a designer worked on it, but they played it safe. Example: a site that follows conventions well but has generic "Learn More" CTAs, uses only size for hierarchy (not weight+color), and has adequate but non-strategic spacing.
 
-A score of 1-2 means: Fundamental failures. No discernible hierarchy, inaccessible, dark patterns present, broken conventions.
+A score of 6 means: Competent with notable gaps. The basics work but 2-3 dimensions are clearly undercooked. Example: decent visual hierarchy but spacing feels arbitrary (no consistent system), CTA copy is generic ("Submit", "Click Here"), social proof is present but weak (unnamed testimonials), and at least one section feels template-driven rather than designed.
+
+A score of 5 means: Mediocre — functional but uninspired. Would not impress a design-aware user. Multiple missed opportunities. Example: a site where all text is similar visual weight (flat hierarchy), spacing varies randomly, CTAs don't stand out, and the overall feel is "this was built, not designed."
+
+A score of 3-4 means: Poor execution with multiple UX violations. Several Hick's Law violations (10+ nav items), Norman Doors present (things that look clickable aren't), poor contrast, cluttered layout, competing CTAs confusing the user.
+
+A score of 1-2 means: Broken fundamentals. No visual hierarchy, inaccessible (fails basic contrast), dark patterns present, conventions violated throughout, the design actively harms usability.
+
+IMPORTANT: Before finalizing scores, compare the sites against EACH OTHER. If Site A has tighter spacing discipline than Site B, Site A MUST score higher on Spacing. If Site B has stronger CTAs, Site B MUST score higher on CTA Clarity. The scores should tell a story about each site's relative strengths and weaknesses.
+
+JUSTIFICATION RULES
+Every score MUST include a "justification" string of 1-2 sentences. Each justification MUST:
+1. Reference the specific principle being applied (e.g., "Hick's Law", "Gestalt Proximity", "Fitts's Law")
+2. Cite a concrete observation from the screenshot (e.g., "the nav has 12 top-level items", "the CTA is 32px tall")
+3. Explain WHY this observation leads to this specific score (e.g., "...which exceeds Miller's threshold, earning a 4")
+A justification like "Good" or "Decent use of color" is unacceptable. Be specific and evidence-based.
 
 OUTPUT FORMAT
 
@@ -103,14 +118,26 @@ Respond in valid JSON only. Begin your response with an opening brace. Include n
 
 {
   "scores": {
-    "visualHierarchy": 0, "colorUsage": 0, "typography": 0, "spacing": 0,
-    "ctaClarity": 0, "navigation": 0, "mobileReadiness": 0,
-    "consistency": 0, "accessibility": 0, "engagement": 0
+    "visualHierarchy": { "score": 0, "justification": "" },
+    "colorUsage": { "score": 0, "justification": "" },
+    "typography": { "score": 0, "justification": "" },
+    "spacing": { "score": 0, "justification": "" },
+    "ctaClarity": { "score": 0, "justification": "" },
+    "navigation": { "score": 0, "justification": "" },
+    "mobileReadiness": { "score": 0, "justification": "" },
+    "consistency": { "score": 0, "justification": "" },
+    "accessibility": { "score": 0, "justification": "" },
+    "engagement": { "score": 0, "justification": "" }
   },
   "principleScores": {
-    "cognitiveLoad": 0, "trustSignals": 0, "affordanceClarity": 0,
-    "feedbackCompleteness": 0, "conventionAdherence": 0, "gestaltCompliance": 0,
-    "copyQuality": 0, "conversionPsychology": 0
+    "cognitiveLoad": { "score": 0, "justification": "" },
+    "trustSignals": { "score": 0, "justification": "" },
+    "affordanceClarity": { "score": 0, "justification": "" },
+    "feedbackCompleteness": { "score": 0, "justification": "" },
+    "conventionAdherence": { "score": 0, "justification": "" },
+    "gestaltCompliance": { "score": 0, "justification": "" },
+    "copyQuality": { "score": 0, "justification": "" },
+    "conversionPsychology": { "score": 0, "justification": "" }
   },
   "overallScore": 0,
   "patterns": [{"name": "", "description": "", "location": "", "effectiveness": "high|medium|low", "principle": "which UX principle this leverages"}],
@@ -178,6 +205,18 @@ Create detailed, copy-paste-ready prompts for each page section. Each prompt sho
 
 Generate prompts for: hero, navigation, social proof, features, pricing, testimonials, how-it-works, FAQ, CTA section, footer, and one comprehensive mega-prompt for the entire page.
 
+SECTION 5: BASELINE COMPARISON FRAMEWORK
+The analyzed sites are your reference benchmarks. Your recommendations should explicitly reference what the analyzed sites do well and what they do poorly. For each major recommendation in the brief, cite at least one analyzed site as a positive or negative example (e.g., "Adopt Site A's approach to social proof (scored 9/10) — they use named testimonials with metrics. Avoid Site B's generic 'Submit' CTAs (scored 4/10).").
+
+For each analyzed site, provide:
+- An overall assessment with the site's score
+- The single most important takeaway from this site
+- Top strengths and weaknesses
+- 3-5 score highlights: the most notable scores (both highest and lowest) with their justifications from the analysis
+- A comparison note explaining how this site compares to others in the set (e.g., "Strongest navigation of the set but weakest CTA clarity")
+
+Frame the entire brief as: "Based on analysis of {siteCount} reference sites, here is what works, what to avoid, and what to build."
+
 Respond in valid JSON only. Begin your response with an opening brace.
 
 {
@@ -200,7 +239,7 @@ Respond in valid JSON only. Begin your response with an opening brace.
     "features": "", "pricing": "", "testimonials": "",
     "howItWorks": "", "faq": "", "cta": "", "footer": "", "overall": ""
   },
-  "analyzedSites": [{"url": "", "score": 0, "keyTakeaway": ""}]
+  "analyzedSites": [{"url": "", "overallScore": 0, "keyTakeaway": "", "strengths": [""], "weaknesses": [""], "scoreHighlights": [{"dimension": "", "score": 0, "justification": ""}], "comparisonNotes": ""}]
 }`;
 
 // ============================================
