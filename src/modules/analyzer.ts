@@ -4,13 +4,13 @@
 // Sends screenshots to a vision-capable LLM via OpenRouter
 // and returns structured UI/UX analysis with psychology-informed scoring.
 
-import { chatCompletion, base64ImageBlock } from "../lib/llm.js";
-import type { CrawlResult, UIAnalysis } from "../types/index.js";
+import { chatCompletion, base64ImageBlock } from "../lib/llm";
+import type { CrawlResult, UIAnalysis } from "../types/index";
 import {
   SYSTEM_PROMPT,
   ANALYZE_SCREENSHOT_PROMPT,
   CATEGORY_OVERLAYS,
-} from "../prompts/index.js";
+} from "../prompts/index";
 
 export async function analyzeSite(
   crawlResult: CrawlResult,

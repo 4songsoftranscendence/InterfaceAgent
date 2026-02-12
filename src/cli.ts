@@ -3,7 +3,7 @@
 // DESIGN SCOUT — CLI
 // ============================================
 // The main entry point. Run:
-//   npx tsx src/cli.ts scout --urls "https://linear.app,https://notion.so" --category saas-landing --goal "Build a CRM landing page"
+//   npx tsx src/cli.ts scout --urls "https://linear.app,https://notion.so" --category saas-landing --goal "Build a modern landing page"
 //   npx tsx src/cli.ts analyze --url "https://stripe.com"
 //   npx tsx src/cli.ts library --category saas-landing
 
@@ -13,18 +13,18 @@ config();
 import { Command } from "commander";
 import * as fs from "fs/promises";
 import * as path from "path";
-import { crawlSite, crawlMultiple } from "./modules/crawler.js";
-import { analyzeSite, analyzeMultiple } from "./modules/analyzer.js";
-import { generateBrief } from "./modules/brief-generator.js";
+import { crawlSite, crawlMultiple } from "./modules/crawler";
+import { analyzeSite, analyzeMultiple } from "./modules/analyzer";
+import { generateBrief } from "./modules/brief-generator";
 import {
   saveAnalysis,
   saveBrief,
   getByCategory,
   getBriefs,
   SETUP_SQL,
-} from "./modules/storage.js";
-import { CATEGORY_OVERLAYS, SECTION_PROMPTS } from "./prompts/index.js";
-import type { DesignBrief } from "./types/index.js";
+} from "./modules/storage";
+import { CATEGORY_OVERLAYS, SECTION_PROMPTS } from "./prompts/index";
+import type { DesignBrief } from "./types/index";
 
 const program = new Command();
 
@@ -33,7 +33,7 @@ program
   .description(
     "🔍 AI Design Research Agent — Crawl sites, analyze UI/UX, generate design briefs"
   )
-  .version("0.1.0");
+  .version("0.2.0");
 
 // ============================================
 // SCOUT — Full pipeline: crawl → analyze → brief

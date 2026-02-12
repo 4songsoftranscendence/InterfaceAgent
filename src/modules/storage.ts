@@ -12,7 +12,7 @@ import type {
   UIAnalysis,
   DesignBrief,
   LibraryEntry,
-} from "../types/index.js";
+} from "../types/index";
 
 let supabase: SupabaseClient | null = null;
 

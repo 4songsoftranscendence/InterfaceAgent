@@ -4,10 +4,10 @@
 // Takes multiple site analyses and generates a psychology-informed
 // design brief with actionable build prompts via OpenRouter.
 
-import { chatCompletion } from "../lib/llm.js";
+import { chatCompletion } from "../lib/llm";
 import { randomUUID } from "crypto";
-import type { UIAnalysis, DesignBrief } from "../types/index.js";
-import { SYSTEM_PROMPT, GENERATE_BRIEF_PROMPT } from "../prompts/index.js";
+import type { UIAnalysis, DesignBrief } from "../types/index";
+import { SYSTEM_PROMPT, GENERATE_BRIEF_PROMPT } from "../prompts/index";
 
 export async function generateBrief(
   analyses: UIAnalysis[],

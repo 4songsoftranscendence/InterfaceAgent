@@ -7,7 +7,7 @@
 import { chromium, type Browser, type Page } from "playwright";
 import * as fs from "fs/promises";
 import * as path from "path";
-import type { CrawlResult, Screenshot } from "../types/index.js";
+import type { CrawlResult, Screenshot } from "../types/index";
 
 interface CrawlOptions {
   width?: number;

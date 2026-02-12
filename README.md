@@ -1,6 +1,6 @@
-# 🔍 Design Scout
+# Design Scout
 
-**AI Design Research Agent** — Crawl websites, analyze UI/UX with Claude Vision, and generate design briefs with ready-to-use build prompts.
+**AI Design Research Agent** — Crawl websites, analyze UI/UX with any vision model, and generate design briefs with ready-to-use build prompts.
 
 > Give it a list of websites. It screenshots them, evaluates them like a senior UX designer, and generates a design brief you can paste into Cursor/Claude/v0 to actually build something.
 
@@ -9,49 +9,19 @@
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    DESIGN SCOUT                      │
-│                                                      │
-│  CLI / Future Web UI                                 │
-│  ┌──────────┐  ┌──────────┐  ┌───────────────────┐  │
-│  │  scout    │  │ analyze  │  │ library / prompts │  │
-│  └────┬─────┘  └────┬─────┘  └────────┬──────────┘  │
-│       │              │                 │             │
-│  ┌────▼──────────────▼─────────────────▼──────────┐  │
-│  │              ORCHESTRATOR                       │  │
-│  └──┬──────────┬──────────┬──────────┬────────────┘  │
-│     │          │          │          │               │
-│  ┌──▼───┐  ┌──▼───┐  ┌──▼────┐  ┌──▼─────┐        │
-│  │Crawl │  │Analyze│  │Brief  │  │Storage │        │
-│  │      │  │      │  │Gen    │  │        │        │
-│  │Playw-│  │Claude│  │Claude │  │Supa-   │        │
-│  │right │  │Vision│  │Text   │  │base or │        │
-│  │      │  │API   │  │API    │  │Local   │        │
-│  └──────┘  └──────┘  └───────┘  └────────┘        │
-│                                                      │
-│  ┌──────────────────────────────────────────────┐    │
-│  │         PROMPT LIBRARY (the secret sauce)     │    │
-│  │  • UX heuristic scoring rubric                │    │
-│  │  • Category overlays (SaaS, healthcare, etc)  │    │
-│  │  • Section prompts (hero, pricing, etc)       │    │
-│  └──────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────┘
-```
-
-### Data Flow
-
-```
 URLs → [Playwright] → Screenshots + Metadata
                           ↓
-Screenshots → [Claude Vision API] → Structured UI/UX Analysis (JSON)
-                                        ↓
-Analyses → [Claude Text API] → Design Brief + Build Prompts
-                                    ↓
-                              [Supabase / Local JSON]
-                                    ↓
-                              Markdown Brief File
-                              (with copy-paste prompts)
+Screenshots → [Vision Model via OpenRouter] → Structured UI/UX Analysis (JSON)
+                                                  ↓
+Analyses → [LLM via OpenRouter] → Design Brief + Build Prompts
+                                      ↓
+                                [Supabase / Local JSON]
+                                      ↓
+                                Markdown Brief File
+                                (with copy-paste prompts)
 ```
+
+Uses **OpenRouter** to access any vision-capable model. Default: **Gemini 2.0 Flash** (~$0.0002 per screenshot analyzed).
 
 ---
 
@@ -60,8 +30,8 @@ Analyses → [Claude Text API] → Design Brief + Build Prompts
 ### 1. Install
 
 ```bash
-git clone <your-repo>/design-scout
-cd design-scout
+git clone https://github.com/4songsoftranscendence/InterfaceAgent.git
+cd InterfaceAgent
 npm install
 npx playwright install chromium
 ```
@@ -70,8 +40,7 @@ npx playwright install chromium
 
 ```bash
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
-# Optionally add SUPABASE_URL and SUPABASE_ANON_KEY
+# Edit .env and add your OPENROUTER_API_KEY (get one at https://openrouter.ai/keys)
 ```
 
 ### 3. Run
@@ -81,7 +50,7 @@ cp .env.example .env
 npx tsx src/cli.ts scout \
   --urls "https://linear.app,https://notion.so,https://vercel.com" \
   --category saas-landing \
-  --goal "Build a CRM landing page for healthcare enrollment"
+  --goal "Build a modern landing page for my product"
 
 # Quick single-site analysis
 npx tsx src/cli.ts analyze --url "https://stripe.com" --category saas-landing
@@ -98,6 +67,13 @@ npx tsx src/cli.ts prompts
 npx tsx src/cli.ts prompts --section hero-saas
 ```
 
+### 4. Web UI (local)
+
+```bash
+npx next dev
+# Open http://localhost:3000
+```
+
 ---
 
 ## What It Produces
@@ -107,12 +83,14 @@ Multiple viewport captures per site (desktop, mobile, hero section, etc.)
 
 ### 2. UI/UX Analysis (per site)
 - **10 heuristic scores** (1-10): visual hierarchy, color, typography, spacing, CTA clarity, navigation, mobile readiness, consistency, accessibility, engagement
+- **8 psychology scores**: cognitive load, trust signals, affordance clarity, feedback, conventions, gestalt, copy quality, conversion psychology
 - **Design patterns detected** with effectiveness ratings
 - **Design tokens extracted**: colors, fonts, spacing, border-radius, shadows
 - **Strengths & weaknesses** (specific, not generic)
 
 ### 3. Design Brief
 - Executive summary & target audience
+- Psychology strategy (hook model, trust building, friction reduction, conversion tactics)
 - Recommended approach (layout, color, typography, CTA, content structure, interactions)
 - Suggested design system (palette, fonts, spacing, component list)
 - **Ready-to-paste build prompts** for every section (hero, nav, social proof, features, CTA, footer, and a mega-prompt for the full page)
@@ -134,32 +112,23 @@ Built-in category overlays add domain expertise to the analysis:
 
 ---
 
-## Supabase Setup (Optional)
+## Model Configuration
 
-If you want persistent storage, run this in your Supabase SQL editor:
+Default model is `google/gemini-2.0-flash-001` via OpenRouter. Override with:
 
 ```bash
-npx tsx src/cli.ts setup
+# In .env
+SCOUT_MODEL=anthropic/claude-sonnet-4  # or any OpenRouter vision model
 ```
 
-This prints the SQL to create the required tables. Without Supabase, everything saves to `./output/library/` as JSON files.
+Browse available models at [openrouter.ai/models](https://openrouter.ai/models?modality=image).
 
----
+### Cost Estimate
 
-## Adding to Your Stack
-
-### Use with Cursor / Claude Code
-The generated brief markdown includes prompts designed to be pasted directly into AI coding tools. The "mega-prompt" in particular is tuned to give Claude/Cursor enough context to generate an entire page.
-
-### Use with SuperDesign (Chrome Extension)
-1. Run Design Scout to generate your brief
-2. Use SuperDesign's "Clone any website" on the highest-scoring reference site
-3. Apply the brief's design tokens and recommendations to modify the clone
-
-### Use with Figma + UX Pilot
-1. Run Design Scout to identify patterns and design tokens
-2. Feed the design system recommendations into UX Pilot for wireframes
-3. Use the component list to build your Figma component library
+Each full scout run (3 sites, standard depth):
+- **Gemini 2.0 Flash** (default): ~$0.001-0.005 per run
+- **Claude Sonnet**: ~$0.30-0.80 per run
+- **Free models** (Qwen, Llama): $0 (rate-limited)
 
 ---
 
@@ -171,30 +140,8 @@ Edit `src/prompts/index.ts` → `CATEGORY_OVERLAYS` and add your domain-specific
 ### Add new section prompts
 Edit `src/prompts/index.ts` → `SECTION_PROMPTS` with copy-paste-ready prompts for new sections.
 
-### Build a web UI
-The modules are designed to be imported directly:
-
-```typescript
-import { crawlSite } from "./modules/crawler.js";
-import { analyzeSite } from "./modules/analyzer.js";
-import { generateBrief } from "./modules/brief-generator.js";
-
-// Use in an Express/Next.js API route
-const crawl = await crawlSite("https://example.com");
-const analysis = await analyzeSite(crawl, "saas-landing");
-```
-
----
-
-## Cost Estimate
-
-Each full scout run (3 sites, standard depth) costs approximately:
-- **Claude API**: ~$0.30-0.80 (depending on screenshot sizes and model)
-- **Supabase**: Free tier is fine for hundreds of entries
-- **Total per run**: Under $1
-
 ---
 
 ## License
 
-MIT — Do whatever you want with it.
+MIT
