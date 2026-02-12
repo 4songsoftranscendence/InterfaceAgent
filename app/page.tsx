@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useApiKey } from "@/app/lib/api-key-context";
+import { apiFetch } from "@/app/lib/api-fetch";
 
 const CATEGORIES = [
   { id: "saas-landing", label: "SaaS Landing", description: "Value prop, pricing, CTAs, social proof" },
@@ -24,9 +26,19 @@ interface ProgressData {
 }
 
 export default function Home() {
+  const { apiKey } = useApiKey();
+
+  // Smart prompt
+  const [smartPrompt, setSmartPrompt] = useState("");
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState("");
+
+  // Form
   const [urls, setUrls] = useState([""]);
   const [category, setCategory] = useState("saas-landing");
   const [goal, setGoal] = useState("");
+
+  // Pipeline state
   const [state, setState] = useState<"idle" | "running" | "complete" | "error">("idle");
   const [progress, setProgress] = useState<ProgressData | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -46,6 +58,39 @@ export default function Home() {
     setUrls(next);
   }
 
+  async function handleSmartPrompt() {
+    if (!smartPrompt.trim()) return;
+    setSuggesting(true);
+    setSuggestError("");
+
+    try {
+      const res = await apiFetch(
+        "/api/suggest",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: smartPrompt.trim() }),
+        },
+        apiKey
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Suggestion failed");
+      }
+
+      const { urls: suggestedUrls, category: suggestedCategory, goal: suggestedGoal } = await res.json();
+
+      if (suggestedUrls.length > 0) setUrls(suggestedUrls);
+      if (suggestedCategory) setCategory(suggestedCategory);
+      if (suggestedGoal) setGoal(suggestedGoal);
+    } catch (err: any) {
+      setSuggestError(err.message || "Failed to generate suggestions");
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const validUrls = urls.map((u) => u.trim()).filter(Boolean);
@@ -56,11 +101,15 @@ export default function Home() {
     setProgress(null);
 
     try {
-      const res = await fetch("/api/scout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: validUrls, category, goal: goal || "A modern website in this category" }),
-      });
+      const res = await apiFetch(
+        "/api/scout",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls: validUrls, category, goal: goal || "A modern website in this category" }),
+        },
+        apiKey
+      );
 
       if (!res.ok) {
         const err = await res.json();
@@ -88,7 +137,6 @@ export default function Home() {
 
       eventSource.onerror = () => {
         eventSource.close();
-        // Try to fetch final state
         fetch(`/api/scout/${id}`)
           .then((r) => r.json())
           .then((data) => {
@@ -213,8 +261,44 @@ export default function Home() {
       <div>
         <h1 className="text-2xl font-bold">Design Scout</h1>
         <p className="mt-2 text-gray-500">
-          Enter websites to analyze. We'll screenshot them, evaluate their UI/UX, and generate a design brief with build prompts.
+          Enter websites to analyze. We&apos;ll screenshot them, evaluate their UI/UX, and generate a design brief with build prompts.
         </p>
+      </div>
+
+      {/* Smart Prompt */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-5">
+        <label className="mb-2 block text-sm font-semibold text-blue-700">
+          Describe what you want to build
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={smartPrompt}
+            onChange={(e) => setSmartPrompt(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSmartPrompt()}
+            placeholder='e.g., "I want to build a SaaS landing page like Linear and Notion"'
+            className="flex-1 rounded-lg border border-blue-300 bg-white px-4 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <button
+            type="button"
+            onClick={handleSmartPrompt}
+            disabled={!smartPrompt.trim() || suggesting}
+            className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40"
+          >
+            {suggesting ? "Thinking..." : "Suggest"}
+          </button>
+        </div>
+        {suggestError && <p className="mt-2 text-sm text-red-600">{suggestError}</p>}
+        <p className="mt-2 text-xs text-blue-500">
+          We&apos;ll suggest URLs, category, and goal for you. Requires an API key (gear icon above).
+        </p>
+      </div>
+
+      {/* Divider */}
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-gray-200" />
+        <span className="text-xs font-medium text-gray-400">or fill in manually</span>
+        <div className="h-px flex-1 bg-gray-200" />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

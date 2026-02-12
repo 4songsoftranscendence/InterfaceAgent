@@ -11,7 +11,7 @@ import { saveBrief } from "@/src/modules/storage";
 import type { CrawlResult } from "@/src/types/index";
 import { updateJob, type Job } from "./jobs";
 
-export async function runPipeline(job: Job): Promise<void> {
+export async function runPipeline(job: Job, apiKey?: string): Promise<void> {
   const { urls, category, goal } = job.config;
 
   try {
@@ -77,7 +77,7 @@ export async function runPipeline(job: Job): Promise<void> {
       });
 
       try {
-        const analysis = await analyzeSite(crawl, category);
+        const analysis = await analyzeSite(crawl, category, apiKey);
         analyses.push(analysis);
       } catch (err) {
         console.error(`Failed to analyze ${crawl.url}:`, err);
@@ -114,7 +114,7 @@ export async function runPipeline(job: Job): Promise<void> {
       },
     });
 
-    const brief = await generateBrief(analyses, category, goal);
+    const brief = await generateBrief(analyses, category, goal, apiKey);
     await saveBrief(brief);
 
     updateJob(job.id, {

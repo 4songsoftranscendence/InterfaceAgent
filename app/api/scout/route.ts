@@ -4,6 +4,7 @@ import { runPipeline } from "@/app/lib/run-pipeline";
 import { CATEGORY_OVERLAYS } from "@/src/prompts/index";
 
 export async function POST(request: Request) {
+  const userApiKey = request.headers.get("X-OpenRouter-Key") || undefined;
   const body = await request.json();
   const { urls, category, goal } = body;
 
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
   const job = createJob({ urls, category, goal: goal.trim() });
 
   // Fire and forget — pipeline runs in background
-  runPipeline(job).catch((err) => {
+  runPipeline(job, userApiKey).catch((err) => {
     console.error("Pipeline crashed:", err);
   });
 

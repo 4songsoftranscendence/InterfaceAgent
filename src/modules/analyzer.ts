@@ -14,7 +14,8 @@ import {
 
 export async function analyzeSite(
   crawlResult: CrawlResult,
-  category?: string
+  category?: string,
+  apiKey?: string
 ): Promise<UIAnalysis> {
   console.log(`🧠 Analyzing: ${crawlResult.url}`);
 
@@ -54,6 +55,7 @@ Screenshots: ${crawlResult.screenshots.map((s) => `${s.section} (${s.viewport})`
         },
       ],
       jsonMode: true,
+      apiKey,
     });
 
     const analysis = parseAnalysisResponse(raw, crawlResult.url);

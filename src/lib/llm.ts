@@ -25,42 +25,63 @@ export interface LLMConfig {
 }
 
 function getConfig(): LLMConfig {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "OPENROUTER_API_KEY is not set. Get a key at https://openrouter.ai/keys and add it to your .env file."
-    );
-  }
   return {
-    apiKey,
+    apiKey: process.env.OPENROUTER_API_KEY || "",
     model: process.env.SCOUT_MODEL || DEFAULT_MODEL,
     baseUrl: process.env.OPENROUTER_BASE_URL || DEFAULT_BASE_URL,
     maxTokens: Number(process.env.SCOUT_MAX_TOKENS) || DEFAULT_MAX_TOKENS,
   };
 }
 
-// ---- Client singleton ----
+// ---- Client management ----
 
 let client: OpenAI | null = null;
+const clientCache = new Map<string, OpenAI>();
+
+function createClient(apiKey: string, baseUrl: string): OpenAI {
+  return new OpenAI({
+    apiKey,
+    baseURL: baseUrl,
+    defaultHeaders: {
+      "HTTP-Referer": "https://github.com/4songsoftranscendence/InterfaceAgent",
+      "X-Title": "Design Scout",
+    },
+  });
+}
 
 function getClient(): OpenAI {
   if (!client) {
     const config = getConfig();
-    client = new OpenAI({
-      apiKey: config.apiKey,
-      baseURL: config.baseUrl,
-      defaultHeaders: {
-        "HTTP-Referer": "https://github.com/4songsoftranscendence/InterfaceAgent",
-        "X-Title": "Design Scout",
-      },
-    });
+    if (!config.apiKey) {
+      throw new Error(
+        "No API key available. Set OPENROUTER_API_KEY in .env or provide a key in the UI."
+      );
+    }
+    client = createClient(config.apiKey, config.baseUrl);
   }
   return client;
+}
+
+function getClientForKey(apiKey: string): OpenAI {
+  const cached = clientCache.get(apiKey);
+  if (cached) return cached;
+
+  const config = getConfig();
+  const newClient = createClient(apiKey, config.baseUrl);
+  clientCache.set(apiKey, newClient);
+
+  // Limit cache size
+  if (clientCache.size > 20) {
+    const oldest = clientCache.keys().next().value;
+    if (oldest) clientCache.delete(oldest);
+  }
+  return newClient;
 }
 
 /** Reset the client singleton (useful for testing or config changes). */
 export function resetClient(): void {
   client = null;
+  clientCache.clear();
 }
 
 // ---- Image helper ----
@@ -86,6 +107,7 @@ export interface CompletionOptions {
   jsonMode?: boolean;
   maxTokens?: number;
   model?: string;
+  apiKey?: string;
 }
 
 /**
@@ -96,13 +118,21 @@ export interface CompletionOptions {
  * 2. Sets `response_format: { type: "json_object" }`
  * 3. If the model rejects response_format, retries without it
  *
+ * When `apiKey` is provided, it overrides the env var key.
+ *
  * Returns the raw text content of the response.
  */
 export async function chatCompletion(
   options: CompletionOptions
 ): Promise<string> {
   const config = getConfig();
-  const openai = getClient();
+  const effectiveKey = options.apiKey || config.apiKey;
+  if (!effectiveKey) {
+    throw new Error(
+      "No API key provided. Set OPENROUTER_API_KEY in .env or provide a key in the UI settings."
+    );
+  }
+  const openai = options.apiKey ? getClientForKey(options.apiKey) : getClient();
 
   const model = options.model || config.model;
   const maxTokens = options.maxTokens || config.maxTokens;

@@ -12,7 +12,8 @@ import { SYSTEM_PROMPT, GENERATE_BRIEF_PROMPT } from "../prompts/index";
 export async function generateBrief(
   analyses: UIAnalysis[],
   category: string,
-  goal: string
+  goal: string,
+  apiKey?: string
 ): Promise<DesignBrief> {
   console.log(`📝 Generating psychology-informed design brief...`);
 
@@ -88,6 +89,7 @@ Now generate the design brief as JSON.`,
         },
       ],
       jsonMode: true,
+      apiKey,
     });
 
     const brief = parseBriefResponse(raw, category, goal, analyses);
