@@ -5,10 +5,14 @@
 // design brief with actionable build prompts via OpenRouter.
 // Analyzed sites serve as a baseline comparison framework.
 
-import { chatCompletion } from "../lib/llm";
+import { chatCompletion, extractJsonFromLLMResponse } from "../lib/llm";
 import { randomUUID } from "crypto";
 import type { UIAnalysis, DesignBrief, JustifiedScore } from "../types/index";
 import { SYSTEM_PROMPT, GENERATE_BRIEF_PROMPT } from "../prompts/index";
+import {
+  compressForBrief,
+  formatCompressedAnalysis,
+} from "../lib/context-compression";
 
 export async function generateBrief(
   analyses: UIAnalysis[],
@@ -23,46 +27,11 @@ export async function generateBrief(
     .replace("{goal}", goal)
     .replace(/\{siteCount\}/g, String(analyses.length));
 
-  // Build comprehensive analysis summary with justifications
-  const analysisSummary = analyses
-    .map((a) => {
-      const formatScore = (label: string, js: JustifiedScore) =>
-        `  ${label}: ${js.score}/10${js.justification ? ` — ${js.justification}` : ""}`;
+  // Compressed analysis — outlier scores with justifications, mid-range abbreviated
+  const compressed = compressForBrief(analyses);
+  const compressedSummary = formatCompressedAnalysis(compressed, 4000);
 
-      return `
---- ${a.url} (Score: ${a.overallScore}/10) ---
-CORE SCORES:
-${formatScore("visualHierarchy", a.scores.visualHierarchy)}
-${formatScore("colorUsage", a.scores.colorUsage)}
-${formatScore("typography", a.scores.typography)}
-${formatScore("spacing", a.scores.spacing)}
-${formatScore("ctaClarity", a.scores.ctaClarity)}
-${formatScore("navigation", a.scores.navigation)}
-${formatScore("mobileReadiness", a.scores.mobileReadiness)}
-${formatScore("consistency", a.scores.consistency)}
-${formatScore("accessibility", a.scores.accessibility)}
-${formatScore("engagement", a.scores.engagement)}
-PSYCHOLOGY SCORES:
-${formatScore("cognitiveLoad", a.principleScores.cognitiveLoad)}
-${formatScore("trustSignals", a.principleScores.trustSignals)}
-${formatScore("affordanceClarity", a.principleScores.affordanceClarity)}
-${formatScore("feedbackCompleteness", a.principleScores.feedbackCompleteness)}
-${formatScore("conventionAdherence", a.principleScores.conventionAdherence)}
-${formatScore("gestaltCompliance", a.principleScores.gestaltCompliance)}
-${formatScore("copyQuality", a.principleScores.copyQuality)}
-${formatScore("conversionPsychology", a.principleScores.conversionPsychology)}
-Strengths: ${a.strengths.join("; ")}
-Weaknesses: ${a.weaknesses.join("; ")}
-Anti-Patterns: ${a.antiPatterns.map((ap) => `${ap.name} (${ap.severity})`).join(", ") || "None detected"}
-Principle Notes: Von Restorff: ${a.principleNotes.vonRestorff} | Peak-End: ${a.principleNotes.peakEnd} | Hook Model: ${a.principleNotes.hookModel}
-Colors: ${a.designTokens.primaryColors.join(", ")} | Accent: ${a.designTokens.accentColors.join(", ")} | Neutrals: ${a.designTokens.neutralColors.join(", ")}
-Fonts: ${a.designTokens.fontFamilies.join(", ")}
-Button Style: ${a.designTokens.buttonStyle}
-Spacing: ${a.designTokens.spacingSystem}
-`;
-    })
-    .join("\n");
-
+  // Aggregate scores for high-level summary
   const coreAvgs = aggregateScores(analyses, "scores");
   const principleAvgs = aggregateScores(analyses, "principleScores");
   const scoresSummary = [
@@ -84,6 +53,14 @@ Spacing: ${a.designTokens.spacingSystem}
     .map((ap) => `• ${ap.name}: ${ap.description} → ${ap.recommendation}`)
     .join("\n");
 
+  // Dynamic token estimation
+  const userContent = `${prompt}\n${scoresSummary}\n${compressedSummary}\n${bestPatterns}\n${worstAntiPatterns}`;
+  const estimatedInputTokens = Math.ceil(userContent.length / 4);
+  const dynamicMaxTokens = Math.min(
+    16384,
+    Math.max(12288, Math.ceil(estimatedInputTokens * 1.5))
+  );
+
   try {
     const raw = await chatCompletion({
       system: SYSTEM_PROMPT,
@@ -97,8 +74,8 @@ Spacing: ${a.designTokens.spacingSystem}
 ### Aggregate Scores Across ${analyses.length} Sites
 ${scoresSummary}
 
-### Individual Site Analyses (with score justifications)
-${analysisSummary}
+### Individual Site Analyses (outlier scores with full justifications, mid-range abbreviated)
+${compressedSummary}
 
 ### Best Patterns Found (high effectiveness)
 ${bestPatterns || "No high-effectiveness patterns identified"}
@@ -106,16 +83,13 @@ ${bestPatterns || "No high-effectiveness patterns identified"}
 ### Anti-Patterns to Avoid
 ${worstAntiPatterns || "No critical anti-patterns detected"}
 
-### Key Principle Observations
-${analyses.map((a) => `${a.url}: Norman Doors: ${a.principleNotes.normanDoors.join(", ") || "none"} | Hick's violations: ${a.principleNotes.hicksViolations.join(", ") || "none"} | Fitts issues: ${a.principleNotes.fittsIssues.join(", ") || "none"}`).join("\n")}
-
 Reference these analyzed sites as benchmarks throughout the brief. For each recommendation, cite at least one site as a positive or negative example.
 
 Now generate the design brief as JSON.`,
         },
       ],
       jsonMode: true,
-      maxTokens: 12288,
+      maxTokens: dynamicMaxTokens,
       apiKey,
     });
 
@@ -181,15 +155,7 @@ function parseBriefResponse(
   goal: string,
   analyses: UIAnalysis[]
 ): DesignBrief {
-  let jsonStr = raw;
-  const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (jsonMatch) jsonStr = jsonMatch[1];
-
-  const firstBrace = jsonStr.indexOf("{");
-  const lastBrace = jsonStr.lastIndexOf("}");
-  if (firstBrace !== -1 && lastBrace !== -1) {
-    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
-  }
+  const jsonStr = extractJsonFromLLMResponse(raw);
 
   const emptyBrief: DesignBrief = {
     id: randomUUID(),

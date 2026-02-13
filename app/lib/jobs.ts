@@ -10,6 +10,7 @@ export interface JobProgress {
   sitesCrawled: number;
   sitesAnalyzed: number;
   briefGenerated: boolean;
+  sitesInBrief?: number;
 }
 
 export interface Job {
@@ -20,6 +21,7 @@ export interface Job {
   analyses: UIAnalysis[];
   result?: DesignBrief;
   error?: string;
+  warnings: string[];
   createdAt: Date;
 }
 
@@ -42,6 +44,7 @@ export function createJob(config: Job["config"]): Job {
       briefGenerated: false,
     },
     analyses: [],
+    warnings: [],
     createdAt: new Date(),
   };
   jobs.set(id, job);

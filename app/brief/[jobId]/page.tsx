@@ -221,10 +221,39 @@ function SiteCard({ site }: { site: AnalyzedSite }) {
   );
 }
 
+function WarningsBanner({ warnings }: { warnings: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!warnings || warnings.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-yellow-600 font-semibold text-sm">
+          {warnings.length} warning{warnings.length !== 1 ? "s" : ""} during analysis
+        </span>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs text-yellow-600 hover:text-yellow-800"
+        >
+          {expanded ? "Hide" : "Show details"}
+        </button>
+      </div>
+      {expanded && (
+        <ul className="mt-3 space-y-1">
+          {warnings.map((w, i) => (
+            <li key={i} className="text-xs text-yellow-700">{w}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function BriefPage() {
   const params = useParams();
   const jobId = params.jobId as string;
   const [brief, setBrief] = useState<Brief | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -232,6 +261,7 @@ export default function BriefPage() {
     fetch(`/api/scout/${jobId}`)
       .then((r) => r.json())
       .then((data) => {
+        if (data.warnings) setWarnings(data.warnings);
         if (data.error) {
           setError(data.error);
         } else if (data.result) {
@@ -300,6 +330,9 @@ export default function BriefPage() {
           <span className="text-sm text-gray-500">{brief.goal}</span>
         </div>
       </div>
+
+      {/* Warnings */}
+      <WarningsBanner warnings={warnings} />
 
       {/* Summary */}
       <Section title="Summary">

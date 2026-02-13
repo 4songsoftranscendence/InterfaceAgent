@@ -27,6 +27,8 @@ export interface Screenshot {
   base64: string;
   viewport: string;
   section: string;
+  scrollDepth?: number;
+  label?: string;
 }
 
 // ============================================

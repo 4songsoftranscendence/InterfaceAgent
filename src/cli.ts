@@ -74,8 +74,8 @@ program
       opts.depth === "quick"
         ? (["above-fold"] as const)
         : opts.depth === "deep"
-          ? (["full", "above-fold", "hero", "footer", "mobile"] as const)
-          : (["full", "above-fold", "mobile"] as const);
+          ? (["full", "above-fold", "hero", "footer", "tablet", "mobile"] as const)
+          : (["full", "above-fold", "tablet", "mobile"] as const);
 
     // Step 1: Crawl
     console.log("━━━ STEP 1/3: Crawling ━━━");

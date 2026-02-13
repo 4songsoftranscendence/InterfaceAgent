@@ -28,6 +28,7 @@ export async function GET(
         .sort((x, y) => y.score - x.score)
         .slice(0, 5),
     })),
+    warnings: job.warnings || [],
     error: job.error || null,
     createdAt: job.createdAt,
   });

@@ -8,11 +8,14 @@ import { crawlSite } from "@/src/modules/crawler";
 import { analyzeSite } from "@/src/modules/analyzer";
 import { generateBrief } from "@/src/modules/brief-generator";
 import { saveBrief } from "@/src/modules/storage";
+import { RePromptBudget } from "@/src/lib/score-validation";
 import type { CrawlResult } from "@/src/types/index";
 import { updateJob, type Job } from "./jobs";
 
 export async function runPipeline(job: Job, apiKey?: string): Promise<void> {
   const { urls, category, goal } = job.config;
+  const warnings: string[] = [];
+  const repromptBudget = new RePromptBudget(1, 3);
 
   try {
     // Step 1: Crawl all URLs
@@ -38,11 +41,14 @@ export async function runPipeline(job: Job, apiKey?: string): Promise<void> {
         });
         crawlResults.push(result);
       } catch (err) {
-        console.error(`Failed to crawl ${url}:`, err);
+        const msg = `Crawl failed for ${new URL(url).hostname}: ${(err as Error)?.message || "unknown error"}`;
+        console.error(msg);
+        warnings.push(msg);
       }
 
       updateJob(job.id, {
         progress: { ...job.progress, sitesCrawled: i + 1 },
+        warnings: [...warnings],
       });
     }
 
@@ -50,6 +56,7 @@ export async function runPipeline(job: Job, apiKey?: string): Promise<void> {
       updateJob(job.id, {
         status: "error",
         error: "None of the URLs could be crawled. Please check the URLs and try again.",
+        warnings: [...warnings],
       });
       return;
     }
@@ -85,9 +92,11 @@ export async function runPipeline(job: Job, apiKey?: string): Promise<void> {
       const batchResults = await Promise.all(
         batch.map(async (crawl) => {
           try {
-            return await analyzeSite(crawl, category, apiKey);
+            return await analyzeSite(crawl, category, apiKey, repromptBudget);
           } catch (err) {
-            console.error(`Failed to analyze ${crawl.url}:`, err);
+            const msg = `Analysis failed for ${new URL(crawl.url).hostname}: ${(err as Error)?.message || "unknown error"}`;
+            console.error(msg);
+            warnings.push(msg);
             return null;
           }
         })
@@ -100,6 +109,7 @@ export async function runPipeline(job: Job, apiKey?: string): Promise<void> {
 
       updateJob(job.id, {
         progress: { ...job.progress, sitesCrawled: crawlResults.length, sitesAnalyzed: analysisCompleted },
+        warnings: [...warnings],
       });
 
       // Rate limit between batches
@@ -108,15 +118,23 @@ export async function runPipeline(job: Job, apiKey?: string): Promise<void> {
       }
     }
 
+    // Log re-prompt stats
+    if (repromptBudget.stats.totalReprompts > 0) {
+      const msg = `Score validation triggered ${repromptBudget.stats.totalReprompts} re-prompt(s) across ${repromptBudget.stats.sitesReprompted} site(s)`;
+      console.log(`   ℹ️  ${msg}`);
+      warnings.push(msg);
+    }
+
     if (analyses.length === 0) {
       updateJob(job.id, {
         status: "error",
         error: "Analysis failed for all sites. This may be a temporary API issue — please try again.",
+        warnings: [...warnings],
       });
       return;
     }
 
-    updateJob(job.id, { analyses });
+    updateJob(job.id, { analyses, warnings: [...warnings] });
 
     // Step 3: Generate brief
     updateJob(job.id, {
@@ -135,10 +153,12 @@ export async function runPipeline(job: Job, apiKey?: string): Promise<void> {
     updateJob(job.id, {
       status: "complete",
       result: brief,
+      warnings: [...warnings],
       progress: {
         ...job.progress,
         sitesCrawled: crawlResults.length,
         sitesAnalyzed: analyses.length,
+        sitesInBrief: analyses.length,
         briefGenerated: true,
         currentStep: "Complete!",
       },
@@ -148,6 +168,7 @@ export async function runPipeline(job: Job, apiKey?: string): Promise<void> {
     updateJob(job.id, {
       status: "error",
       error: err?.message || "An unexpected error occurred.",
+      warnings: [...warnings],
     });
   }
 }

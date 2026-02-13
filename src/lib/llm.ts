@@ -99,6 +99,29 @@ export function base64ImageBlock(
   };
 }
 
+// ---- JSON extraction helper ----
+
+/**
+ * Extract a JSON object from an LLM response string.
+ * Handles: bare JSON, markdown-fenced JSON, text with embedded JSON.
+ */
+export function extractJsonFromLLMResponse(raw: string): string {
+  let jsonStr = raw;
+
+  // Strip markdown code fences
+  const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) jsonStr = jsonMatch[1];
+
+  // Find outermost braces
+  const firstBrace = jsonStr.indexOf("{");
+  const lastBrace = jsonStr.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+  }
+
+  return jsonStr;
+}
+
 // ---- Core completion function ----
 
 export interface CompletionOptions {

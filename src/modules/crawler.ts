@@ -8,25 +8,33 @@ import { chromium, type Browser, type Page } from "playwright";
 import * as fs from "fs/promises";
 import * as path from "path";
 import type { CrawlResult, Screenshot } from "../types/index";
+import { getCachedCrawl, setCachedCrawl } from "../lib/crawl-cache";
 
 interface CrawlOptions {
   width?: number;
   height?: number;
   outputDir?: string;
-  sections?: ("full" | "above-fold" | "hero" | "footer" | "mobile")[];
+  sections?: ("full" | "above-fold" | "hero" | "footer" | "mobile" | "tablet")[];
 }
 
 const DEFAULT_OPTIONS: CrawlOptions = {
   width: 1440,
   height: 900,
   outputDir: "./output/screenshots",
-  sections: ["full", "above-fold", "mobile"],
+  sections: ["full", "above-fold", "mobile", "tablet"],
 };
 
 export async function crawlSite(
   url: string,
   opts: CrawlOptions = {}
 ): Promise<CrawlResult> {
+  // Check cache first
+  const cached = await getCachedCrawl(url);
+  if (cached) {
+    console.log(`🔍 Cache hit for: ${url} (${cached.screenshots.length} screenshots)`);
+    return cached;
+  }
+
   const options = { ...DEFAULT_OPTIONS, ...opts };
   const outputDir = options.outputDir!;
   await fs.mkdir(outputDir, { recursive: true });
@@ -81,7 +89,7 @@ export async function crawlSite(
       `   ✅ Captured ${screenshots.length} screenshots from ${url}`
     );
 
-    return {
+    const result: CrawlResult = {
       url,
       pageTitle,
       metaDescription: metaDescription ?? undefined,
@@ -91,6 +99,11 @@ export async function crawlSite(
       techStack,
       crawledAt: new Date().toISOString(),
     };
+
+    // Store in cache for future runs (non-blocking, non-fatal)
+    await setCachedCrawl(url, result).catch(() => {});
+
+    return result;
   } catch (error) {
     console.error(`   ❌ Failed to crawl ${url}:`, error);
     throw error;
@@ -154,6 +167,17 @@ async function captureSection(
         }
         break;
       }
+      case "tablet": {
+        await page.setViewportSize({ width: 768, height: 1024 });
+        await page.waitForTimeout(1000);
+        await page.screenshot({ path: filepath });
+        await page.setViewportSize({
+          width: options.width!,
+          height: options.height!,
+        });
+        await page.waitForTimeout(500);
+        break;
+      }
       case "mobile": {
         // Resize to mobile viewport, screenshot, then restore
         await page.setViewportSize({ width: 390, height: 844 });
@@ -179,14 +203,27 @@ async function captureSection(
     const buffer = await fs.readFile(filepath);
     const base64 = buffer.toString("base64");
 
+    // Assign scroll depth and viewport metadata
+    const SCROLL_DEPTHS: Record<string, number> = {
+      "above-fold": 0,
+      hero: 5,
+      full: 50,
+      footer: 95,
+      tablet: 0,
+      mobile: 0,
+    };
+
     return {
       filepath,
       base64,
       viewport:
         section === "mobile"
           ? "mobile-390x844"
-          : `desktop-${options.width}x${options.height}`,
+          : section === "tablet"
+            ? "tablet-768x1024"
+            : `desktop-${options.width}x${options.height}`,
       section,
+      scrollDepth: SCROLL_DEPTHS[section] ?? 0,
     };
   } catch (error) {
     console.warn(`   ⚠️  Could not capture ${section} for ${slug}`);
@@ -199,27 +236,92 @@ async function extractDesignTokens(
 ): Promise<{ fonts: string[]; colors: string[] }> {
   try {
     const tokens = await page.evaluate(() => {
-      const allElements = document.querySelectorAll("*");
       const fontSet = new Set<string>();
       const colorSet = new Set<string>();
 
-      // Sample elements (don't iterate all for perf)
-      const sample = Array.from(allElements).slice(0, 200);
-      for (const el of sample) {
-        const style = window.getComputedStyle(el);
-        if (style.fontFamily) {
-          // Extract first font in stack
-          const primary = style.fontFamily.split(",")[0].trim().replace(/['"]/g, "");
-          if (primary) fontSet.add(primary);
+      // PHASE 1: Extract from CSS custom properties (preferred — these ARE the design system)
+      try {
+        const sheets = Array.from(document.styleSheets);
+        for (const sheet of sheets) {
+          try {
+            for (const rule of Array.from(sheet.cssRules)) {
+              if (
+                rule instanceof CSSStyleRule &&
+                rule.selectorText === ":root"
+              ) {
+                const style = rule.style;
+                for (let i = 0; i < style.length; i++) {
+                  const name = style[i];
+                  const prop = style.getPropertyValue(name).trim();
+                  if (!prop) continue;
+                  if (
+                    name.startsWith("--color") ||
+                    name.startsWith("--clr") ||
+                    /--[\w-]*colou?r/i.test(name)
+                  ) {
+                    colorSet.add(prop);
+                  }
+                  if (
+                    name.startsWith("--font") ||
+                    /--[\w-]*font/i.test(name)
+                  ) {
+                    fontSet.add(
+                      prop.split(",")[0].trim().replace(/['"]/g, "")
+                    );
+                  }
+                }
+              }
+            }
+          } catch {
+            /* cross-origin sheet, skip */
+          }
         }
-        if (style.color) colorSet.add(style.color);
-        if (style.backgroundColor && style.backgroundColor !== "rgba(0, 0, 0, 0)")
-          colorSet.add(style.backgroundColor);
+      } catch {
+        /* stylesheet access failed */
+      }
+
+      // PHASE 2: Fall back to computed styles if custom properties yielded little
+      if (colorSet.size < 3 || fontSet.size < 2) {
+        const allElements = document.querySelectorAll("*");
+        const sample = Array.from(allElements).slice(0, 200);
+        for (const el of sample) {
+          const style = window.getComputedStyle(el);
+          if (style.fontFamily) {
+            const primary = style.fontFamily
+              .split(",")[0]
+              .trim()
+              .replace(/['"]/g, "");
+            if (primary) fontSet.add(primary);
+          }
+          if (style.color) colorSet.add(style.color);
+          if (
+            style.backgroundColor &&
+            style.backgroundColor !== "rgba(0, 0, 0, 0)"
+          )
+            colorSet.add(style.backgroundColor);
+        }
+      }
+
+      // PHASE 3: Deduplicate colors by rounding RGB to nearest 5
+      function roundRgb(color: string): string {
+        const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (match) {
+          const r = Math.round(parseInt(match[1]) / 5) * 5;
+          const g = Math.round(parseInt(match[2]) / 5) * 5;
+          const b = Math.round(parseInt(match[3]) / 5) * 5;
+          return `rgb(${r}, ${g}, ${b})`;
+        }
+        return color;
+      }
+
+      const roundedColors = new Set<string>();
+      for (const c of colorSet) {
+        roundedColors.add(roundRgb(c));
       }
 
       return {
-        fonts: Array.from(fontSet).slice(0, 10),
-        colors: Array.from(colorSet).slice(0, 20),
+        fonts: Array.from(fontSet).slice(0, 4),
+        colors: Array.from(roundedColors).slice(0, 8),
       };
     });
     return tokens;
